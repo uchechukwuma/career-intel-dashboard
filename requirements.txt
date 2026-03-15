@@ -1,7 +1,6 @@
-streamlit
+﻿streamlit
 pymongo
 pandas
 plotly
 python-dotenv
 certifi
-dnspython
