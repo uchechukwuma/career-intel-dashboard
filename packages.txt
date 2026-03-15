@@ -1,4 +1,0 @@
-zlib1g-dev
-libfreetype6-dev
-pkg-config
-build-essential
