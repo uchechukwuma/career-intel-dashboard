@@ -1,0 +1,26 @@
+# Secrets
+.env
+.streamlit/secrets.toml
+config.yaml
+*.conf
+
+# Python
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+*.csv
+*.json
+*.xlsx
