@@ -7,36 +7,6 @@ import certifi
 from collections import Counter
 import requests
 
-try:
-    ip_response = requests.get("https://api64.ipify.org?format=json", timeout=5)
-    if ip_response.status_code == 200:
-        streamlit_ip = ip_response.json().get("ip")
-        st.warning(f"⚠️ **DEBUG - Your Streamlit Cloud IP is: {streamlit_ip}**")
-        st.info(f"Add this IP to MongoDB Atlas: `{streamlit_ip}/32`")
-    else:
-        st.error("Could not detect IP")
-except Exception as e:
-    st.error(f"IP detection failed: {e}")
-
-# IP Detection for Debugging
-def get_streamlit_ip():
-    """Get the external IP address of the Streamlit Cloud instance."""
-    try:
-        response = requests.get("https://api64.ipify.org?format=json", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("ip")
-    except Exception as e:
-        return f"Could not detect IP: {e}"
-    return "Unknown"
-
-# Display IP for debugging (remove after whitelisting)
-with st.expander("🔧 Debug Info", expanded=False):
-    ip_address = get_streamlit_ip()
-    st.write(f"**Streamlit Cloud IP:** {ip_address}")
-    st.write("**Add this IP to MongoDB Atlas Network Access:**")
-    st.code(f"{ip_address}/32", language="text")
-    st.write("**Current MongoDB connection status:**")
 
 # Page config
 st.set_page_config(
