@@ -76,9 +76,10 @@ def init_connection():
         client = pymongo.MongoClient(
             connection_string,
             tlsCAFile=certifi.where(),
-            server_api=ServerApi('1'),
-            # Keep these for stability in cloud environments
-            serverSelectionTimeoutMS=30000,
+            # For Free Tier, we remove server_api if it's causing issues
+            # and keep timeouts strictly moderate
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=10000,
             retryWrites=True
         )
         
