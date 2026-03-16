@@ -48,40 +48,54 @@ st.markdown("German labor market signals — updated daily from 23+ sources")
 def init_connection():
     """Connect to MongoDB Atlas using secrets."""
     try:
-        # Try Streamlit secrets first
+        import ssl
+        import certifi
+        from pymongo.server_api import ServerApi
+        
+        # Get connection string
         if "mongo" in st.secrets:
             connection_string = st.secrets["mongo"]["url"]
+            db_name = st.secrets["mongo"]["database"]
+            collection_name = st.secrets["mongo"]["collection"]
         else:
-            # Fallback to environment variables
             import os
             from dotenv import load_dotenv
             load_dotenv()
             connection_string = os.getenv("MONGODB_URI")
+            db_name = os.getenv("MONGODB_DATABASE", "career_intelligence_v2")
+            collection_name = os.getenv("MONGODB_COLLECTION", "career_articles")
+            
             if not connection_string:
-                st.error("MongoDB connection string not found in secrets or environment")
+                st.error("MongoDB connection string not found")
                 return None
         
-        # IMPORTANT: Add tlsAllowInvalidCertificates for debugging
-        # and increase timeout
+        # Create TLS context for TLS 1.2
+        tls_context = ssl.create_default_context(cafile=certifi.where())
+        tls_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        tls_context.maximum_version = ssl.TLSVersion.TLSv1_2
+        
+        # Connect with explicit settings
         client = pymongo.MongoClient(
             connection_string,
             tls=True,
-            tlsAllowInvalidCertificates=True,  # Temporary fix for SSL issue
-            serverSelectionTimeoutMS=10000,     # Increased from 5000
-            connectTimeoutMS=10000,
-            socketTimeoutMS=45000
+            tlsContext=tls_context,
+            server_api=ServerApi('1'),
+            serverSelectionTimeoutMS=30000,
+            connectTimeoutMS=30000,
+            socketTimeoutMS=45000,
+            retryWrites=True,
+            retryReads=True
         )
         
-        # Test connection with ping
+        # Force connection with ping
         client.admin.command('ping')
-        st.success("✅ Connected to MongoDB!")
+        st.success(f"✅ Connected to MongoDB! Found {client[db_name][collection_name].count_documents({})} articles")
         return client
         
     except Exception as e:
         st.error(f"❌ Connection failed: {e}")
-        # Print full error details for debugging
         import traceback
-        st.error(traceback.format_exc())
+        st.error(f"Full error: {traceback.format_exc()}")
         return None
 
 # Access control
