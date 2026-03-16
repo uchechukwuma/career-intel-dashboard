@@ -68,12 +68,14 @@ def init_connection():
                 st.error("MongoDB connection string not found")
                 return None
         
-        # SIMPLE connection - exactly like your working local test
+        # Streamlit Cloud specific fix - disable SSL verification temporarily
         client = pymongo.MongoClient(
             connection_string,
-            tlsCAFile=certifi.where(),  # This is the key!
+            tls=True,
+            tlsAllowInvalidCertificates=True,  # Critical for Streamlit Cloud!
             server_api=ServerApi('1'),
-            serverSelectionTimeoutMS=10000
+            serverSelectionTimeoutMS=30000,
+            connectTimeoutMS=30000
         )
         
         # Test connection
