@@ -130,10 +130,127 @@ def check_premium_access():
     
     return st.session_state.premium
 
-# Load data
+# ============================================
+# ENTITY CLEANING FUNCTIONS
+# ============================================
+
+def clean_entity_name(entity):
+    """
+    Clean and normalize entity names (topics or companies).
+    
+    - Replaces underscores with spaces
+    - Converts to title case
+    - Handles common acronyms
+    - Removes extra whitespace
+    """
+    if not isinstance(entity, str):
+        return entity
+    
+    # Replace underscores with spaces and strip
+    cleaned = entity.replace('_', ' ').strip()
+    
+    # If empty after cleaning, return original
+    if not cleaned:
+        return entity
+    
+    # Convert to title case (each word starts with capital)
+    cleaned = cleaned.title()
+    
+    # Common acronyms that should stay uppercase
+    acronyms = [
+        # German labor market specific
+        'AI', 'HR', 'ML', 'CEO', 'CTO', 'CFO', 'COO', 'CIO', 'CTO',
+        'API', 'SaaS', 'IAB', 'BMAS', 'DGB', 'FAZ', 'MDR', 'RND', 'DPA',
+        'EU', 'USA', 'UK', 'IT', 'KI', 'AG', 'GMBH', 'SE', 'PLC',
+        
+        # Companies
+        'SAP', 'IBM', 'BMW', 'VW', 'DB', 'DHL', 'Lufthansa', 'Siemens',
+        'BASF', 'Bayer', 'Mercedes', 'Audi', 'Porsche', 'Adidas', 'Puma',
+        'Deutsche Telekom', 'Telekom', 'Vodafone', 'O2', 'E.ON', 'RWE',
+        
+        # Tech
+        'AWS', 'GCP', 'Azure', 'OpenAI', 'Anthropic', 'Meta', 'Google',
+        'Microsoft', 'Apple', 'Amazon', 'Netflix', 'Oracle', 'Salesforce',
+        'Adobe', 'Intel', 'Nvidia', 'AMD', 'TSMC', 'Samsung',
+        
+        # Media
+        'ARD', 'ZDF', 'RTL', 'ProSieben', 'Sat.1', 'Axel Springer',
+        
+        # Organizations
+        'IG Metall', 'Verdi', 'IG BCE', 'DGB', 'BDA', 'DIHK', 'ZDH',
+        'Ifo', 'IAB', 'DIW', 'RWI', 'ZEW', 'IW', 'KOF'
+    ]
+    
+    # Check if cleaned version matches any acronym
+    # Try exact match with cleaned
+    if cleaned in acronyms:
+        return cleaned
+    
+    # Try uppercase version without spaces
+    cleaned_upper = cleaned.upper().replace(' ', '')
+    for acro in acronyms:
+        acro_clean = acro.upper().replace(' ', '')
+        if cleaned_upper == acro_clean:
+            return acro
+    
+    # Special case for "And" in company names
+    cleaned = cleaned.replace(' And ', ' and ')
+    
+    # Special case for "Der", "Die", "Das" (German articles)
+    cleaned = cleaned.replace(' Der ', ' der ')
+    cleaned = cleaned.replace(' Die ', ' die ')
+    cleaned = cleaned.replace(' Das ', ' das ')
+    cleaned = cleaned.replace(' Des ', ' des ')
+    cleaned = cleaned.replace(' Dem ', ' dem ')
+    cleaned = cleaned.replace(' Den ', ' den ')
+    
+    # Special case for prepositions
+    cleaned = cleaned.replace(' In ', ' in ')
+    cleaned = cleaned.replace(' An ', ' an ')
+    cleaned = cleaned.replace(' Auf ', ' auf ')
+    cleaned = cleaned.replace(' Aus ', ' aus ')
+    cleaned = cleaned.replace(' Bei ', ' bei ')
+    cleaned = cleaned.replace(' Mit ', ' mit ')
+    cleaned = cleaned.replace(' Von ', ' von ')
+    cleaned = cleaned.replace(' Zu ', ' zu ')
+    
+    return cleaned
+
+def clean_entity_list(entity_list):
+    """
+    Clean a list of entity names.
+    
+    - Applies clean_entity_name to each item
+    - Removes duplicates
+    - Filters out empty strings
+    """
+    if not isinstance(entity_list, list):
+        return entity_list
+    
+    cleaned = []
+    for entity in entity_list:
+        if entity and isinstance(entity, str):
+            cleaned_entity = clean_entity_name(entity)
+            if cleaned_entity and cleaned_entity.strip():
+                cleaned.append(cleaned_entity)
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    deduped = []
+    for entity in cleaned:
+        if entity not in seen:
+            seen.add(entity)
+            deduped.append(entity)
+    
+    return deduped
+
+# ============================================
+# DATA LOADING WITH CLEANING
+# ============================================
+
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def load_data(days_back=30, is_premium=False):
-    """Load articles from last N days."""
+    """Load articles from last N days with entity cleaning."""
     client = init_connection()
     if client is None:
         return pd.DataFrame()
@@ -177,6 +294,21 @@ def load_data(days_back=30, is_premium=False):
         for article in data:
             scores = article.get('scores', {})
             
+            # Get extracted companies and clean them
+            extracted_companies = article.get('extracted_companies', [])
+            if isinstance(extracted_companies, list):
+                extracted_companies = clean_entity_list(extracted_companies)
+            
+            # Get extracted topics and clean them
+            extracted_topics = article.get('extracted_topics', [])
+            if isinstance(extracted_topics, list):
+                extracted_topics = clean_entity_list(extracted_topics)
+            
+            # Clean single extracted company if present
+            extracted_company = article.get('extracted_company')
+            if extracted_company and isinstance(extracted_company, str):
+                extracted_company = clean_entity_name(extracted_company)
+            
             row = {
                 'id': str(article['_id']),
                 'headline': article.get('headline', ''),
@@ -190,9 +322,9 @@ def load_data(days_back=30, is_premium=False):
                 'timeliness': scores.get('timeliness_score', 0) * 100,
                 'geographic_relevance': scores.get('geographic_relevance_score', 0) * 100,
                 'career_actionability': scores.get('career_actionability_score', 0) * 100,
-                'extracted_company': article.get('extracted_company'),
-                'extracted_companies': article.get('extracted_companies', []),
-                'extracted_topics': article.get('extracted_topics', []),
+                'extracted_company': extracted_company,
+                'extracted_companies': extracted_companies,
+                'extracted_topics': extracted_topics,
             }
             rows.append(row)
         
@@ -227,6 +359,26 @@ with st.spinner("🔄 Loading latest signals..."):
 if df.empty:
     st.warning("⚠️ No data found. Check your MongoDB connection.")
     st.stop()
+
+# ============================================
+# ADDITIONAL CLEANING FOR DISPLAY
+# ============================================
+
+# Ensure all entity fields are cleaned (re-run cleaning just to be safe)
+if 'extracted_companies' in df.columns:
+    df['extracted_companies'] = df['extracted_companies'].apply(
+        lambda x: clean_entity_list(x) if isinstance(x, list) else x
+    )
+
+if 'extracted_topics' in df.columns:
+    df['extracted_topics'] = df['extracted_topics'].apply(
+        lambda x: clean_entity_list(x) if isinstance(x, list) else x
+    )
+
+if 'extracted_company' in df.columns:
+    df['extracted_company'] = df['extracted_company'].apply(
+        lambda x: clean_entity_name(x) if isinstance(x, str) else x
+    )
 
 # Sidebar filters
 st.sidebar.header("🔍 Filters")
@@ -412,7 +564,9 @@ with col1:
             if isinstance(topics, list):
                 for topic in topics:
                     if topic and isinstance(topic, str):
-                        topic_counts[topic] = topic_counts.get(topic, 0) + 1
+                        # Double-check cleaning on display (safety)
+                        clean_topic = clean_entity_name(topic)
+                        topic_counts[clean_topic] = topic_counts.get(clean_topic, 0) + 1
         
         if topic_counts:
             topic_df = pd.DataFrame(
@@ -456,14 +610,18 @@ st.markdown(f"Showing {len(filtered_df)} articles")
 # Prepare display columns
 display_df = filtered_df.copy()
 
-# Create companies string for display
-display_df['companies'] = display_df.apply(
-    lambda row: ', '.join(
-        [row['extracted_company']] if row['extracted_company'] else []
-        + (row['extracted_companies'] if isinstance(row['extracted_companies'], list) else [])
-    ) if row['extracted_company'] or row['extracted_companies'] else '',
-    axis=1
-)
+# Clean company strings for display one more time
+def get_clean_company_string(row):
+    companies = []
+    if row['extracted_company'] and isinstance(row['extracted_company'], str):
+        companies.append(row['extracted_company'])
+    if isinstance(row['extracted_companies'], list):
+        companies.extend(row['extracted_companies'])
+    # Remove duplicates
+    companies = list(dict.fromkeys(companies))
+    return ', '.join(companies) if companies else ''
+
+display_df['companies'] = display_df.apply(get_clean_company_string, axis=1)
 
 # Select columns for display
 display_cols = ['headline', 'verified_source_name', 'companies', 'final_score', 'published_at']
@@ -508,7 +666,7 @@ if not is_premium:
             "• 📈 Advanced filters\n"
             "• 📉 Export unlimited data\n"
             "• 🔔 Daily email alerts\n\n"
-            "[👉 Subscribe for €9/month](https://careerintelligence.carrd.co)"
+            "[👉 Subscribe for €0/month](https://careerintelligence.carrd.co)"
         )
 
 # Footer
