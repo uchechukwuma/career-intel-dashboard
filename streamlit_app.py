@@ -61,35 +61,28 @@ def init_connection():
                 st.error("MongoDB connection string not found in secrets or environment")
                 return None
         
+        # IMPORTANT: Add tlsAllowInvalidCertificates for debugging
+        # and increase timeout
         client = pymongo.MongoClient(
             connection_string,
-            tlsCAFile=certifi.where(),
-            serverSelectionTimeoutMS=5000
+            tls=True,
+            tlsAllowInvalidCertificates=True,  # Temporary fix for SSL issue
+            serverSelectionTimeoutMS=10000,     # Increased from 5000
+            connectTimeoutMS=10000,
+            socketTimeoutMS=45000
         )
-        # Test connection
+        
+        # Test connection with ping
         client.admin.command('ping')
+        st.success("✅ Connected to MongoDB!")
         return client
+        
     except Exception as e:
         st.error(f"❌ Connection failed: {e}")
+        # Print full error details for debugging
+        import traceback
+        st.error(traceback.format_exc())
         return None
-
-
-st.write("🔍 Debug Info")
-st.write("Secrets keys found:", list(st.secrets.keys()))
-
-if "mongo" in st.secrets:
-    st.write("MongoDB section found with keys:", list(st.secrets["mongo"].keys()))
-    
-    # Try to get external IP (helps with whitelisting)
-    try:
-        ip = requests.get("https://api64.ipify.org?format=json").json().get("ip")
-        st.write("Your Streamlit Cloud IP:", ip)
-    except:
-        st.write("Could not determine IP")
-else:
-    st.write("❌ [mongo] section not found in secrets")
-    st.stop()  # Stop execution here
-
 
 # Access control
 def check_premium_access():
