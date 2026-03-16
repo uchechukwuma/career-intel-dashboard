@@ -75,16 +75,11 @@ def init_connection():
         
         client = pymongo.MongoClient(
             connection_string,
-            tls=True,                               # Enables TLS
-            tlsAllowInvalidCertificates=False,      # Security best practice
-            tlsCAFile=certifi.where(),              # Uses certifi for CA bundle
-            # REMOVED: tlsContext=tls_context       <-- This was the culprit
+            tlsCAFile=certifi.where(),
             server_api=ServerApi('1'),
+            # Keep these for stability in cloud environments
             serverSelectionTimeoutMS=30000,
-            connectTimeoutMS=30000,
-            socketTimeoutMS=45000,
-            retryWrites=True,
-            retryReads=True
+            retryWrites=True
         )
         
         # Force connection
