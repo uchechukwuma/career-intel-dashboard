@@ -5,6 +5,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import certifi
 from collections import Counter
+import requests
 
 # Page config
 st.set_page_config(
@@ -71,6 +72,24 @@ def init_connection():
     except Exception as e:
         st.error(f"❌ Connection failed: {e}")
         return None
+
+
+st.write("🔍 Debug Info")
+st.write("Secrets keys found:", list(st.secrets.keys()))
+
+if "mongo" in st.secrets:
+    st.write("MongoDB section found with keys:", list(st.secrets["mongo"].keys()))
+    
+    # Try to get external IP (helps with whitelisting)
+    try:
+        ip = requests.get("https://api64.ipify.org?format=json").json().get("ip")
+        st.write("Your Streamlit Cloud IP:", ip)
+    except:
+        st.write("Could not determine IP")
+else:
+    st.write("❌ [mongo] section not found in secrets")
+    st.stop()  # Stop execution here
+
 
 # Access control
 def check_premium_access():
