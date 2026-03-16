@@ -81,7 +81,6 @@ def init_connection():
     """Connect to MongoDB Atlas using secrets."""
     try:
         import certifi
-        import ssl
         from pymongo.server_api import ServerApi
         
         if "mongo" in st.secrets:
@@ -100,16 +99,10 @@ def init_connection():
                 st.error("MongoDB connection string not found")
                 return None
         
-        # Create a custom SSL context that forces TLS 1.2
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
-        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-        ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
-        
-        # Connect with explicit SSL settings
+        # SIMPLE connection - let PyMongo handle SSL automatically
         client = pymongo.MongoClient(
             connection_string,
-            tls=True,
-            ssl_context=ssl_context,  # ← Changed from tls_context to ssl_context
+            tlsCAFile=certifi.where(),  # Use this instead of context
             server_api=ServerApi('1'),
             serverSelectionTimeoutMS=30000,
             connectTimeoutMS=30000,
