@@ -80,6 +80,7 @@ def init_connection():
     """Connect to MongoDB Atlas using secrets."""
     try:
         import certifi
+        import ssl
         from pymongo.server_api import ServerApi
         
         if "mongo" in st.secrets:
@@ -98,12 +99,17 @@ def init_connection():
                 st.error("MongoDB connection string not found")
                 return None
         
-        # For Streamlit Cloud - use tlsAllowInvalidCertificates WITHOUT tlsDisableOCSPEndpointCheck
+        # Create a custom SSL context that forces TLS 1.2
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
+        
+        # Connect with explicit TLS settings
         client = pymongo.MongoClient(
             connection_string,
             tls=True,
-            tlsAllowInvalidCertificates=True,  # Keep this
-            # tlsDisableOCSPEndpointCheck=True,  # REMOVE THIS LINE
+            tls_context=ssl_context,
+            tlsAllowInvalidCertificates=False,
             server_api=ServerApi('1'),
             serverSelectionTimeoutMS=30000,
             connectTimeoutMS=30000,
