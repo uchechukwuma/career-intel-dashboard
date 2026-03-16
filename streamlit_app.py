@@ -48,9 +48,11 @@ st.markdown("German labor market signals — updated daily from 23+ sources")
 def init_connection():
     """Connect to MongoDB Atlas using secrets."""
     try:
-        import ssl        
+        import ssl
+        import certifi
+        import pymongo
         from pymongo.server_api import ServerApi
-                
+        
         # Get connection string
         if "mongo" in st.secrets:
             connection_string = st.secrets["mongo"]["url"]
@@ -68,25 +70,36 @@ def init_connection():
                 st.error("MongoDB connection string not found")
                 return None
         
-        # TLS context (allow both TLS 1.2 + 1.3)
-        tls_context = ssl.create_default_context(cafile=certifi.where())
-        tls_context.minimum_version = ssl.TLSVersion.TLSv1_2
-        # DO NOT SET maximum_version — allow TLS 1.3
+        # CRITICAL: Create SSL context that FORCES TLS 1.2
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2  # Force TLS 1.2 only
+        ssl_context.check_hostname = True
+        ssl_context.verify_mode = ssl.CERT_REQUIRED
         
+        # Connect with TLS 1.2 forced
         client = pymongo.MongoClient(
             connection_string,
-            tlsCAFile=certifi.where(),
-            # For Free Tier, we remove server_api if it's causing issues
-            # and keep timeouts strictly moderate
-            serverSelectionTimeoutMS=5000,
-            connectTimeoutMS=10000,
-            retryWrites=True
+            ssl=True,
+            ssl_context=ssl_context,
+            server_api=ServerApi('1'),
+            serverSelectionTimeoutMS=30000,
+            connectTimeoutMS=30000,
+            socketTimeoutMS=45000,
+            retryWrites=True,
+            retryReads=True
         )
         
-        # Force connection
+        # Test connection
         client.admin.command('ping')
+        st.success(f"✅ Connected to MongoDB!")
         
-        st.success(f"✅ Connected to MongoDB! Found {client[db_name][collection_name].count_documents({})} articles")
+        # Show article count
+        db = client[db_name]
+        collection = db[collection_name]
+        count = collection.count_documents({})
+        st.info(f"📊 Database contains {count} articles")
+        
         return client
         
     except Exception as e:
