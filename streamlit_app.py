@@ -98,16 +98,19 @@ def init_connection():
                 st.error("MongoDB connection string not found")
                 return None
         
-        # Ultimate fallback for Streamlit Cloud
+        # Force TLS 1.2 and disable OCSP for Streamlit Cloud
         client = pymongo.MongoClient(
             connection_string,
             tls=True,
             tlsAllowInvalidCertificates=True,
-            tlsAllowInvalidHostnames=True,  # Add this
+            tlsAllowInvalidHostnames=True,
+            tlsDisableOCSPEndpointCheck=True,  # Critical for Streamlit Cloud
             server_api=ServerApi('1'),
             serverSelectionTimeoutMS=30000,
             connectTimeoutMS=30000,
-            socketTimeoutMS=45000
+            socketTimeoutMS=45000,
+            retryWrites=True,
+            retryReads=True
         )
         
         # Test connection
@@ -126,6 +129,7 @@ def init_connection():
         import traceback
         st.error(f"Full error: {traceback.format_exc()}")
         return None
+
 # Access control
 def check_premium_access():
     """Check if user has premium access."""
