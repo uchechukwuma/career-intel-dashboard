@@ -51,7 +51,6 @@ def init_connection():
         import certifi
         from pymongo.server_api import ServerApi
         
-        # Get connection string
         if "mongo" in st.secrets:
             connection_string = st.secrets["mongo"]["url"]
             db_name = st.secrets["mongo"]["database"]
@@ -68,20 +67,22 @@ def init_connection():
                 st.error("MongoDB connection string not found")
                 return None
         
-        # Streamlit Cloud specific fix - disable SSL verification temporarily
+        # Ultimate fallback for Streamlit Cloud
         client = pymongo.MongoClient(
             connection_string,
             tls=True,
-            tlsAllowInvalidCertificates=True,  # Critical for Streamlit Cloud!
+            tlsAllowInvalidCertificates=True,
+            tlsAllowInvalidHostnames=True,  # Add this
             server_api=ServerApi('1'),
             serverSelectionTimeoutMS=30000,
-            connectTimeoutMS=30000
+            connectTimeoutMS=30000,
+            socketTimeoutMS=45000
         )
         
         # Test connection
         client.admin.command('ping')
         
-        # Show success and article count
+        # Show success
         db = client[db_name]
         collection = db[collection_name]
         count = collection.count_documents({})
@@ -94,7 +95,6 @@ def init_connection():
         import traceback
         st.error(f"Full error: {traceback.format_exc()}")
         return None
-
 # Access control
 def check_premium_access():
     """Check if user has premium access."""
