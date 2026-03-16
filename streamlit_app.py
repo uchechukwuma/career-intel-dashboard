@@ -48,9 +48,7 @@ st.markdown("German labor market signals — updated daily from 23+ sources")
 def init_connection():
     """Connect to MongoDB Atlas using secrets."""
     try:
-        import ssl
         import certifi
-        import pymongo
         from pymongo.server_api import ServerApi
         
         # Get connection string
@@ -70,35 +68,22 @@ def init_connection():
                 st.error("MongoDB connection string not found")
                 return None
         
-        # CRITICAL: Create SSL context that FORCES TLS 1.2
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
-        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-        ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2  # Force TLS 1.2 only
-        ssl_context.check_hostname = True
-        ssl_context.verify_mode = ssl.CERT_REQUIRED
-        
-        # Connect with TLS 1.2 forced
+        # SIMPLE connection - exactly like your working local test
         client = pymongo.MongoClient(
             connection_string,
-            ssl=True,
-            ssl_context=ssl_context,
+            tlsCAFile=certifi.where(),  # This is the key!
             server_api=ServerApi('1'),
-            serverSelectionTimeoutMS=30000,
-            connectTimeoutMS=30000,
-            socketTimeoutMS=45000,
-            retryWrites=True,
-            retryReads=True
+            serverSelectionTimeoutMS=10000
         )
         
         # Test connection
         client.admin.command('ping')
-        st.success(f"✅ Connected to MongoDB!")
         
-        # Show article count
+        # Show success and article count
         db = client[db_name]
         collection = db[collection_name]
         count = collection.count_documents({})
-        st.info(f"📊 Database contains {count} articles")
+        st.success(f"✅ Connected to MongoDB! Found {count} articles")
         
         return client
         
