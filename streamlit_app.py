@@ -75,6 +75,7 @@ st.markdown("""
 st.markdown("German labor market signals — updated daily from 23+ sources")
 
 # MongoDB connection
+
 @st.cache_resource
 def init_connection():
     """Connect to MongoDB Atlas using secrets."""
@@ -104,12 +105,11 @@ def init_connection():
         ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
         ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
         
-        # Connect with explicit TLS settings
+        # Connect with explicit SSL settings
         client = pymongo.MongoClient(
             connection_string,
             tls=True,
-            tls_context=ssl_context,
-            tlsAllowInvalidCertificates=False,
+            ssl_context=ssl_context,  # ← Changed from tls_context to ssl_context
             server_api=ServerApi('1'),
             serverSelectionTimeoutMS=30000,
             connectTimeoutMS=30000,
@@ -134,6 +134,7 @@ def init_connection():
         import traceback
         st.error(f"Full error: {traceback.format_exc()}")
         return None
+
 # Access control
 def check_premium_access():
     """Check if user has premium access."""
