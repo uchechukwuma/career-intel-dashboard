@@ -88,7 +88,7 @@ def init_connection():
         db = client[db_name]
         collection = db[collection_name]
         count = collection.count_documents({})
-        st.success(f"✅ Connected to MongoDB! Found {count} articles")
+        st.success(f"✅ Live!")
         
         return client
         
@@ -558,7 +558,7 @@ col1, col2 = st.columns(2)
 with col1:
     # Topics
     if 'extracted_topics' in filtered_df.columns:
-        st.markdown("**🔥 Hot Topics**")
+        # st.markdown("**🔥 Hot Topics**")
         topic_counts = {}
         for topics in filtered_df['extracted_topics'].dropna():
             if isinstance(topics, list):
@@ -666,7 +666,7 @@ if not is_premium:
             "• 📈 Advanced filters\n"
             "• 📉 Export unlimited data\n"
             "• 🔔 Daily email alerts\n\n"
-            "[👉 Subscribe for €0/month](https://careerintelligence.carrd.co)"
+            "[👉 Subscribe for €49/month](https://careerintelligence.carrd.co)"
         )
 
 # Footer
