@@ -112,29 +112,31 @@ def render_insights_section(is_premium):
         if report.get('trend_velocity'):
             st.markdown("### 📊 Trend Velocity")
             trend = report['trend_velocity']
-            
+    
             if trend:
                 # Create 3 columns for display
                 cols = st.columns(3)
                 items = list(trend.items())
-                
+        
                 for i, (key, value) in enumerate(items):
                     if i < 6:  # Show up to 6 metrics
                         with cols[i % 3]:
                             # Format the key nicely
                             display_key = key.replace('_', ' ').title()
-                            
+                    
                             # Fix AI casing
                             if 'Ai' in display_key:
                                 display_key = display_key.replace('Ai', 'AI')
                             if 'Mom' in display_key:
                                 display_key = display_key.replace('Mom', 'MoM')
-                            
-                            # Display the metric
-                            st.metric(
-                                display_key,
-                                value
-                            )
+                    
+                            # Use st.metric with dark text background
+                            st.markdown(f"""
+                            <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-bottom: 5px;">
+                                <p style="color: #0A0F1F; font-weight: bold; margin: 0;">{display_key}</p>
+                                <p style="color: #0A0F1F; font-size: 1.2rem; margin: 0;">{value}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
             else:
                 st.info("No trend data available")
         
