@@ -8,6 +8,9 @@ QUALITY_THRESHOLD = 40  # percentage
 # Premium pricing
 PREMIUM_PRICE_MONTHLY = 49  # euros
 
+# High Impact threshold (lowered from 70 to 50)
+HIGH_IMPACT_THRESHOLD = 50  # percentage
+
 # Common acronyms that should stay uppercase
 ACRONYMS = [
     # German labor market specific
