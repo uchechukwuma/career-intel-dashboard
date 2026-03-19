@@ -1,16 +1,55 @@
 # ============================================
-# ENTITY CLEANING FUNCTIONS
+# ENTITY CLEANING FUNCTIONS - USING CONFIG
 # ============================================
 
 from src.config import ACRONYMS
+
+def format_entity_properly(entity):
+    """Format entity with proper casing (AI, not Ai)."""
+    if not entity or not isinstance(entity, str):
+        return entity
+    
+    # Build acronym lookup from config
+    acronym_dict = {acro.lower(): acro for acro in ACRONYMS}
+    
+    # Also add common variations
+    special_cases = {
+        'ki': 'KI',
+        'kI': 'KI',
+        'iT': 'IT',
+        'ag': 'AG',
+        'gmbh': 'GmbH',
+        'dax': 'DAX',
+    }
+    acronym_dict.update({k.lower(): v for k, v in special_cases.items()})
+    
+    # Check if it's an acronym (case insensitive)
+    entity_lower = entity.lower().strip()
+    if entity_lower in acronym_dict:
+        return acronym_dict[entity_lower]
+    
+    # Otherwise, do smart title case
+    words = entity.split()
+    formatted = []
+    for word in words:
+        word_lower = word.lower()
+        if word_lower in acronym_dict:
+            formatted.append(acronym_dict[word_lower])
+        elif len(word) > 2 and word.isupper():
+            # If it's already uppercase, keep it
+            formatted.append(word)
+        else:
+            # Normal title case
+            formatted.append(word.capitalize())
+    
+    return ' '.join(formatted)
 
 def clean_entity_name(entity):
     """
     Clean and normalize entity names (topics or companies).
     
     - Replaces underscores with spaces
-    - Converts to title case
-    - Handles common acronyms
+    - Handles common acronyms (AI, not Ai)
     - Removes extra whitespace
     """
     if not isinstance(entity, str):
@@ -23,19 +62,8 @@ def clean_entity_name(entity):
     if not cleaned:
         return entity
     
-    # Convert to title case (each word starts with capital)
-    cleaned = cleaned.title()
-    
-    # Check if cleaned version matches any acronym
-    if cleaned in ACRONYMS:
-        return cleaned
-    
-    # Try uppercase version without spaces
-    cleaned_upper = cleaned.upper().replace(' ', '')
-    for acro in ACRONYMS:
-        acro_clean = acro.upper().replace(' ', '')
-        if cleaned_upper == acro_clean:
-            return acro
+    # Format with proper casing
+    cleaned = format_entity_properly(cleaned)
     
     # Special case for "And" in company names
     cleaned = cleaned.replace(' And ', ' and ')
@@ -59,7 +87,6 @@ def clean_entity_name(entity):
     cleaned = cleaned.replace(' Zu ', ' zu ')
     
     return cleaned
-
 
 def clean_entity_list(entity_list):
     """
@@ -89,7 +116,6 @@ def clean_entity_list(entity_list):
     
     return deduped
 
-
 def get_clean_company_string(row):
     """Convert companies to clean string for display and export."""
     companies = []
@@ -99,11 +125,17 @@ def get_clean_company_string(row):
         companies.extend(row['extracted_companies'])
     # Remove duplicates
     companies = list(dict.fromkeys(companies))
+    
+    # Sort alphabetically
+    companies.sort()
+    
     return ', '.join(companies) if companies else ''
-
 
 def get_clean_topics_string(row):
     """Convert topics list to clean string for export."""
     if isinstance(row.get('extracted_topics'), list):
-        return ', '.join([t for t in row['extracted_topics'] if t])
+        topics = [t for t in row['extracted_topics'] if t]
+        # Sort alphabetically
+        topics.sort()
+        return ', '.join(topics)
     return ''

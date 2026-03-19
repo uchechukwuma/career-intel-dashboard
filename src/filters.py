@@ -1,11 +1,54 @@
 # ============================================
-# FILTERING AND DATA PREPARATION
+# FILTERING AND DATA PREPARATION - WITH FUZZY GROUPING
 # ============================================
 
 import streamlit as st
 from collections import Counter
 import pandas as pd
+from difflib import SequenceMatcher
+from src.clean import clean_entity_name
 
+def consolidate_topics(topics_list, threshold=0.8):
+    """Group similar topics together using fuzzy matching."""
+    if not topics_list:
+        return []
+    
+    # Clean all topics first
+    cleaned = [clean_entity_name(t) for t in topics_list if t]
+    cleaned = list(set(cleaned))  # Remove exact duplicates
+    
+    groups = []
+    used = set()
+    
+    for i, topic1 in enumerate(cleaned):
+        if i in used:
+            continue
+        
+        group = [topic1]
+        used.add(i)
+        
+        for j, topic2 in enumerate(cleaned[i+1:], i+1):
+            if j in used:
+                continue
+            
+            # Check similarity
+            similarity = SequenceMatcher(None, topic1.lower(), topic2.lower()).ratio()
+            
+            # Special handling for common variations
+            if topic1.lower().replace(' ', '') == topic2.lower().replace(' ', ''):
+                similarity = 1.0
+            
+            # Handle acronyms
+            if len(topic1) <= 5 and topic1.isupper() and topic2.upper() == topic1:
+                similarity = 1.0
+            
+            if similarity > threshold:
+                group.append(topic2)
+                used.add(j)
+        
+        groups.append(group)
+    
+    return groups
 
 def get_unique_companies(df):
     """Extract and sort unique companies from dataframe."""
@@ -18,25 +61,26 @@ def get_unique_companies(df):
     all_companies.extend(single_companies)
     
     if all_companies:
-        company_counter = Counter(all_companies)
-        return sorted([c for c in set(all_companies) if c], 
-                     key=lambda x: (-company_counter[x], x))
+        # Clean each company name
+        cleaned_companies = [clean_entity_name(c) for c in all_companies if c]
+        # Remove duplicates and sort alphabetically
+        unique_cleaned = sorted(set(cleaned_companies))
+        return unique_cleaned
     return []
 
-
 def get_unique_topics(df):
-    """Extract and sort unique topics from dataframe."""
+    """Extract and return unique topics with grouping info."""
     all_topics = []
     for topics in df['extracted_topics'].dropna():
         if isinstance(topics, list):
             all_topics.extend(topics)
     
     if all_topics:
-        topic_counter = Counter(all_topics)
-        return sorted([t for t in set(all_topics) if t],
-                     key=lambda x: (-topic_counter[x], x))
+        # Clean each topic
+        cleaned_topics = [clean_entity_name(t) for t in all_topics if t]
+        # Remove duplicates and sort
+        return sorted(set(cleaned_topics))
     return []
-
 
 def apply_filters(df, selected_sources, min_score, selected_companies, selected_topics):
     """Apply all selected filters to dataframe."""
@@ -48,16 +92,24 @@ def apply_filters(df, selected_sources, min_score, selected_companies, selected_
     filtered_df = filtered_df[filtered_df['final_score'] >= min_score]
     
     if selected_companies:
+        # Clean selected companies for comparison
+        cleaned_selected = [clean_entity_name(c) for c in selected_companies]
+        
         filtered_df = filtered_df[
             filtered_df['extracted_companies'].apply(
-                lambda x: any(comp in x for comp in selected_companies) if isinstance(x, list) else False
-            ) | filtered_df['extracted_company'].isin(selected_companies)
+                lambda x: any(clean_entity_name(comp) in cleaned_selected for comp in x) if isinstance(x, list) else False
+            ) | filtered_df['extracted_company'].apply(
+                lambda x: clean_entity_name(x) in cleaned_selected if pd.notna(x) else False
+            )
         ]
     
     if selected_topics:
+        # Clean selected topics for comparison
+        cleaned_selected = [clean_entity_name(t) for t in selected_topics]
+        
         filtered_df = filtered_df[
             filtered_df['extracted_topics'].apply(
-                lambda x: any(topic in x for topic in selected_topics) if isinstance(x, list) else False
+                lambda x: any(clean_entity_name(topic) in cleaned_selected for topic in x) if isinstance(x, list) else False
             )
         ]
     

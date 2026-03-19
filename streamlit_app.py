@@ -3,13 +3,13 @@
 # ============================================
 
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Import our modules
 from src.config import QUALITY_THRESHOLD, PREMIUM_PRICE_MONTHLY
 from src.database import init_connection, load_data
-from src.clean import get_clean_company_string, get_clean_topics_string
-from src.filters import get_unique_companies, get_unique_topics, apply_filters
+from src.clean import get_clean_company_string, get_clean_topics_string, clean_entity_name
+from src.filters import get_unique_companies, get_unique_topics, apply_filters, consolidate_topics
 from src.charts import (
     plot_top_companies, plot_score_distribution,
     plot_top_topics, plot_source_distribution
@@ -49,6 +49,16 @@ st.markdown("""
         .metric-card h2 {
             font-size: 1.2rem;
         }
+    }
+    .topic-group {
+        margin-bottom: 10px;
+        padding: 8px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        border-left: 3px solid #00C2FF;
+    }
+    .topic-group strong {
+        color: #0A0F1F;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -98,32 +108,38 @@ def check_premium_access():
 
 is_premium = check_premium_access()
 
-# Load data
-with st.spinner("🔄 Loading latest signals..."):
-    if is_premium:
-        days = st.sidebar.slider("📅 Time window (days)", 7, 180, 30)
-        df = load_data(days_back=days, is_premium=True)
-    else:
-        df = load_data(days_back=7, is_premium=False)
-        st.sidebar.info(
-            "🔍 **Free Preview**\n\n"
-            "Showing last 7 days only.\n\n"
-            f"[Subscribe for full access](https://careerintelligence.carrd.co) 📈"
-        )
+# Load data with appropriate spinner
+if is_premium:
+    days = st.sidebar.slider("📅 Time window (days)", 7, 180, 30)
+    # No spinner here - the progress bar in load_data handles it
+    df = load_data(days_back=days, is_premium=True)
+else:
+    days = 7  # Default for free users
+    df = load_data(days_back=7, is_premium=False)
+    st.sidebar.info(
+        "🔍 **Free Preview**\n\n"
+        "Showing last 7 days only.\n\n"
+        f"[Subscribe for full access](https://careerintelligence.carrd.co) 📈"
+    )
 
 if df.empty:
     st.warning("⚠️ No data found. Check your MongoDB connection.")
     st.stop()
 
 # ============================================
-# TWO-TIER DATA APPROACH
+# FILTER FOR RECENT ARTICLES (Last 7 days for display)
 # ============================================
 
-# STATS DATA: All articles for accurate trends (after filters are applied)
-# But we'll apply filters first, then separate
+def filter_recent_articles(df, days=7):
+    """Filter dataframe to only include articles from last N days."""
+    if 'published_at' in df.columns:
+        cutoff = datetime.now() - timedelta(days=days)
+        return df[df['published_at'] > cutoff]
+    return df
 
-# QUALITY DATA: Only high-signal articles for display and download
-# We'll create this after filters
+# ============================================
+# TWO-TIER DATA APPROACH
+# ============================================
 
 # Sidebar filters
 st.sidebar.header("🔍 Filters")
@@ -139,16 +155,69 @@ selected_sources = st.sidebar.multiselect(
 # Min score filter
 min_score = st.sidebar.slider("🎯 Min relevance score (%)", 0, 100, 0)
 
-# Company filter
+# Company filter with search
 unique_companies = get_unique_companies(df)
-selected_companies = st.sidebar.multiselect("🏢 Companies", options=unique_companies) if unique_companies else []
+if unique_companies:
+    st.sidebar.markdown("**🔍 Search Companies**")
+    company_search = st.sidebar.text_input("Filter companies", placeholder="e.g., SAP, VW")
+    
+    filtered_companies = [c for c in unique_companies if company_search.lower() in c.lower()] if company_search else unique_companies
+    
+    selected_companies = st.sidebar.multiselect(
+        f"🏢 Companies ({len(filtered_companies)} available)",
+        options=filtered_companies
+    ) if filtered_companies else []
+else:
+    selected_companies = []
 
-# Topic filter
+# Topic filter with search and grouping
 unique_topics = get_unique_topics(df)
-selected_topics = st.sidebar.multiselect("🔥 Topics", options=unique_topics) if unique_topics else []
+if unique_topics:
+    st.sidebar.markdown("**🔍 Search Topics**")
+    topic_search = st.sidebar.text_input("Filter topics", placeholder="e.g., AI, Workplace")
+    
+    # Apply search filter
+    if topic_search:
+        filtered_topics = [t for t in unique_topics if topic_search.lower() in t.lower()]
+    else:
+        filtered_topics = unique_topics
+    
+    # Group similar topics
+    topic_groups = consolidate_topics(filtered_topics)
+    
+    # Create a flat list for multiselect
+    flat_topics = []
+    for group in topic_groups:
+        if len(group) == 1:
+            flat_topics.append(group[0])
+        else:
+            # Use the most common name as representative
+            main_topic = max(group, key=len)
+            flat_topics.append(f"{main_topic} (+{len(group)-1} similar)")
+    
+    selected_topics = st.sidebar.multiselect(
+        f"🔥 Topics ({len(flat_topics)} groups)",
+        options=sorted(flat_topics)
+    )
+    
+    # Store expanded selection for actual filtering
+    expanded_selected = []
+    for sel in selected_topics:
+        if '(+' in sel and 'similar)' in sel:
+            # Find the original group
+            main_name = sel.split(' (+')[0]
+            for group in topic_groups:
+                if main_name in group or any(main_name in g for g in group):
+                    expanded_selected.extend(group)
+                    break
+        else:
+            expanded_selected.append(sel)
+else:
+    selected_topics = []
+    expanded_selected = []
 
 # Apply filters
-filtered_df = apply_filters(df, selected_sources, min_score, selected_companies, selected_topics)
+filtered_df = apply_filters(df, selected_sources, min_score, selected_companies, expanded_selected)
 
 # Now separate into stats (all) and quality (only >40%)
 stats_df = filtered_df.copy()
@@ -205,7 +274,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("**🔥 Most Mentioned Companies**")
-    fig = plot_top_companies(stats_df)  # Using stats data for accurate trends
+    fig = plot_top_companies(stats_df)
     if fig:
         st.plotly_chart(fig, use_container_width=True)
     else:
@@ -236,13 +305,23 @@ with col2:
         st.info("No source data available")
 
 # ============================================
-# ARTICLE CARDS (Using QUALITY data)
+# ARTICLE CARDS (Using QUALITY data, last 7 days only)
 # ============================================
 st.subheader("📰 Top Quality Signals")
-st.markdown(f"Showing {len(quality_df)} high-quality signals (score >{QUALITY_THRESHOLD}%)")
+st.markdown(f"Showing high-quality signals (score >{QUALITY_THRESHOLD}%)")
 
 if len(quality_df) > 0:
-    top_articles = quality_df.sort_values('final_score', ascending=False).head(20)
+    # Try to get recent articles (last 7 days)
+    recent_quality = filter_recent_articles(quality_df, 7)
+    
+    if len(recent_quality) > 0:
+        display_df = recent_quality
+        st.caption(f"📅 Last 7 days: {len(recent_quality)} signals")
+    else:
+        display_df = quality_df
+        st.caption(f"⚠️ No signals from last 7 days. Showing best available: {len(quality_df)} signals")
+    
+    top_articles = display_df.sort_values('final_score', ascending=False).head(20)
     
     for i in range(0, len(top_articles), 2):
         cols = st.columns(2)
