@@ -7,28 +7,28 @@ from src.config import COLORS, BADGE_THRESHOLDS
 from src.clean import get_clean_company_string, get_clean_topics_string
 
 def render_metric_card(title, value, icon, color_gradient, subtitle=None):
-    """Render a uniform metric card with EXACT same size for all."""
-    subtitle_html = f'<p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0; font-size: 0.75rem; line-height: 1.2;">{subtitle}</p>' if subtitle else ''
+    """Render a uniform metric card with taller height."""
+    subtitle_html = f'<p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 0.8rem; line-height: 1.3;">{subtitle}</p>' if subtitle else ''
     
-    # Use fixed height and width with flexbox for perfect alignment
     st.markdown(f"""
     <div style="
         background: linear-gradient(135deg, {color_gradient[0]} 0%, {color_gradient[1]} 100%);
-        padding: 12px 8px;
-        border-radius: 10px;
+        padding: 15px 10px;
+        border-radius: 12px;
         text-align: center;
-        height: 160px;
+        height: 180px;
         width: 100%;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         box-sizing: border-box;
-        margin: 0 auto;
+        margin: 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     ">
         <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
-            <h3 style="color: white; margin: 0; font-size: 1.3rem; line-height: 1.2;">{icon}</h3>
-            <h2 style="color: #0A0F1F; margin: 5px 0 2px 0; font-size: 1.5rem; font-weight: bold; line-height: 1.2;">{value}</h2>
-            <p style="color: white; margin: 0; font-weight: 500; font-size: 0.9rem; line-height: 1.3;">{title}</p>
+            <h3 style="color: white; margin: 0 0 5px 0; font-size: 1.5rem;">{icon}</h3>
+            <h2 style="color: #0A0F1F; margin: 0 0 5px 0; font-size: 1.8rem; font-weight: bold;">{value}</h2>
+            <p style="color: white; margin: 0; font-weight: 500; font-size: 1rem;">{title}</p>
         </div>
         {subtitle_html}
     </div>
