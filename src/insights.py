@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 from src.database import init_connection
-from src.config import COLORS
+from src.config import COLORS, HIGH_IMPACT_THRESHOLD
 
 def get_latest_weekly_report():
     """Fetch the latest weekly executive report from MongoDB."""
@@ -42,20 +42,7 @@ def get_latest_weekly_report():
         st.warning(f"Could not fetch weekly report: {e}")
         return None
 
-def is_metric_real(key, value):
-    """Check if a metric appears real vs hardcoded."""
-    suspicious_patterns = [
-        ('low_wage_persistence', '-2.1%'),
-        ('vector_velocity', '+150%'),
-        ('robotics_capital', '+125%'),
-        ('ai_displacement', '0%'),
-        ('strike_intensity', '1.8x'),
-    ]
-    
-    for pattern_key, pattern_value in suspicious_patterns:
-        if key == pattern_key and pattern_value in str(value):
-            return False
-    return True
+# REMOVED: is_metric_real function - we want to show ALL data
 
 def render_insights_section(is_premium):
     """Render the insights section with REAL data from MongoDB."""
@@ -87,24 +74,6 @@ def render_insights_section(is_premium):
                 <span style="color: {COLORS['dark']};">{report['executive_summary']}</span>
             </div>
             """, unsafe_allow_html=True)
-        
-        # Dashboard Metrics - FIXED: Renamed threshold
-        if report.get('dashboard'):
-            dashboard = report['dashboard']
-            st.markdown("### 📈 Key Metrics")
-            cols = st.columns(4)
-            metrics = dashboard.get('metrics', [])
-            
-            for i, metric in enumerate(metrics[:4]):
-                with cols[i % 4]:
-                    # Rename "High Impact (>95%)" to "High Impact (>70%)"
-                    if 'High Impact' in metric.get('name', ''):
-                        metric['name'] = 'High Impact (>70%)'
-                    st.metric(
-                        metric.get('name', ''),
-                        metric.get('current', ''),
-                        delta=metric.get('change', '')
-                    )
         
         # Top Signals
         if report.get('top_signals'):
@@ -139,32 +108,35 @@ def render_insights_section(is_premium):
                 </div>
                 """, unsafe_allow_html=True)
         
-        # Trend Velocity - Filter out hardcoded values
+        # ===== UPDATED: Trend Velocity - Show ALL data =====
         if report.get('trend_velocity'):
             st.markdown("### 📊 Trend Velocity")
             trend = report['trend_velocity']
             
-            # Filter out suspicious values
-            real_trend = {}
-            for key, value in trend.items():
-                if is_metric_real(key, value):
-                    real_trend[key] = value
-            
-            if real_trend:
+            if trend:
+                # Create 3 columns for display
                 cols = st.columns(3)
-                items = list(real_trend.items())
+                items = list(trend.items())
+                
                 for i, (key, value) in enumerate(items):
-                    if i < 6:
+                    if i < 6:  # Show up to 6 metrics
                         with cols[i % 3]:
+                            # Format the key nicely
                             display_key = key.replace('_', ' ').title()
+                            
+                            # Fix AI casing
                             if 'Ai' in display_key:
                                 display_key = display_key.replace('Ai', 'AI')
+                            if 'Mom' in display_key:
+                                display_key = display_key.replace('Mom', 'MoM')
+                            
+                            # Display the metric
                             st.metric(
                                 display_key,
                                 value
                             )
             else:
-                st.info("Trend data being calibrated...")
+                st.info("No trend data available")
         
         # Risk Matrix - Only show if real data
         if report.get('risk_matrix'):

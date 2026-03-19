@@ -138,19 +138,20 @@ def load_data(days_back=30, is_premium=False):
             if extracted_company and isinstance(extracted_company, str):
                 extracted_company = clean_entity_name(extracted_company)
             
+            # When creating the row dictionary, ensure scores are floats:
             row = {
                 'id': str(article['_id']),
                 'headline': article.get('headline', ''),
                 'verified_source_name': article.get('verified_source_name', 'Unknown'),
                 'source_id': article.get('source_id', 'unknown'),
                 'published_at': article.get('published_at'),
-                'final_score': scores.get('final_score', 0) * 100,  # Convert to percentage
-                'signal_strength': scores.get('signal_strength_score', 0) * 100,
-                'career_impact': scores.get('career_impact_score', 0) * 100,
-                'company_significance': scores.get('company_significance_score', 0) * 100,
-                'timeliness': scores.get('timeliness_score', 0) * 100,
-                'geographic_relevance': scores.get('geographic_relevance_score', 0) * 100,
-                'career_actionability': scores.get('career_actionability_score', 0) * 100,
+                'final_score': float(scores.get('final_score', 0)) * 100,
+                'signal_strength': float(scores.get('signal_strength_score', 0)) * 100,
+                'career_impact': float(scores.get('career_impact_score', 0)) * 100,
+                'company_significance': float(scores.get('company_significance_score', 0)) * 100,
+                'timeliness': float(scores.get('timeliness_score', 0)) * 100,
+                'geographic_relevance': float(scores.get('geographic_relevance_score', 0)) * 100,
+                'career_actionability': float(scores.get('career_actionability_score', 0)) * 100,
                 'extracted_company': extracted_company,
                 'extracted_companies': extracted_companies,
                 'extracted_topics': extracted_topics,

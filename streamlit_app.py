@@ -6,7 +6,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 
 # Import our modules
-from src.config import QUALITY_THRESHOLD, PREMIUM_PRICE_MONTHLY
+from src.config import QUALITY_THRESHOLD, PREMIUM_PRICE_MONTHLY, HIGH_IMPACT_THRESHOLD, COLORS
 from src.database import init_connection, load_data
 from src.clean import get_clean_company_string, get_clean_topics_string, clean_entity_name
 from src.filters import get_unique_companies, get_unique_topics, apply_filters, consolidate_topics
@@ -59,6 +59,11 @@ st.markdown("""
     }
     .topic-group strong {
         color: #0A0F1F;
+    }
+    .debug-info {
+        font-size: 0.8rem;
+        color: #666;
+        margin-top: 5px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -127,6 +132,29 @@ if df.empty:
     st.stop()
 
 # ============================================
+# DEBUG: Check score distribution (optional)
+# ============================================
+if st.sidebar.checkbox("Show Score Debug", False):
+    st.sidebar.markdown("### 📊 Score Distribution")
+    if 'final_score' in df.columns:
+        score_ranges = {
+            "90-100%": len(df[df['final_score'] >= 90]),
+            "70-89%": len(df[(df['final_score'] >= 70) & (df['final_score'] < 90)]),
+            "50-69%": len(df[(df['final_score'] >= 50) & (df['final_score'] < 70)]),
+            "40-49%": len(df[(df['final_score'] >= 40) & (df['final_score'] < 50)]),
+            "<40%": len(df[df['final_score'] < 40]),
+        }
+        for range_name, count in score_ranges.items():
+            st.sidebar.write(f"{range_name}: {count} articles")
+    
+    # Check field existence
+    st.sidebar.markdown("### 🔧 Field Check")
+    for field in ['timeliness', 'geographic_relevance', 'career_impact']:
+        if field in df.columns:
+            non_zero = (df[field] > 0).sum()
+            st.sidebar.write(f"{field}: {non_zero}/{len(df)} non-zero")
+
+# ============================================
 # FILTER FOR RECENT ARTICLES (Last 7 days for display)
 # ============================================
 
@@ -159,7 +187,7 @@ min_score = st.sidebar.slider("🎯 Min relevance score (%)", 0, 100, 0)
 unique_companies = get_unique_companies(df)
 if unique_companies:
     st.sidebar.markdown("**🔍 Search Companies**")
-    company_search = st.sidebar.text_input("Filter companies", placeholder="e.g., SAP, VW")
+    company_search = st.sidebar.text_input("Filter companies", placeholder="e.g., SAP, VW", key="company_search")
     
     filtered_companies = [c for c in unique_companies if company_search.lower() in c.lower()] if company_search else unique_companies
     
@@ -170,51 +198,84 @@ if unique_companies:
 else:
     selected_companies = []
 
-# Topic filter with search and grouping
+# ============================================
+# TOPIC FILTER - OPTIMIZED WITH SIMPLE MODE
+# ============================================
+
 unique_topics = get_unique_topics(df)
+selected_topics = []
+expanded_selected = []
+
 if unique_topics:
-    st.sidebar.markdown("**🔍 Search Topics**")
-    topic_search = st.sidebar.text_input("Filter topics", placeholder="e.g., AI, Workplace")
+    st.sidebar.markdown("### 🔥 Topics")
     
-    # Apply search filter
-    if topic_search:
-        filtered_topics = [t for t in unique_topics if topic_search.lower() in t.lower()]
-    else:
-        filtered_topics = unique_topics
-    
-    # Group similar topics
-    topic_groups = consolidate_topics(filtered_topics)
-    
-    # Create a flat list for multiselect
-    flat_topics = []
-    for group in topic_groups:
-        if len(group) == 1:
-            flat_topics.append(group[0])
-        else:
-            # Use the most common name as representative
-            main_topic = max(group, key=len)
-            flat_topics.append(f"{main_topic} (+{len(group)-1} similar)")
-    
-    selected_topics = st.sidebar.multiselect(
-        f"🔥 Topics ({len(flat_topics)} groups)",
-        options=sorted(flat_topics)
+    # Performance toggle - default to simple mode for speed
+    use_simple_topics = st.sidebar.checkbox(
+        "✓ Use simple topic list (faster)", 
+        value=True,
+        help="Disable topic grouping for better performance. Grouping can be slow with many topics."
     )
     
-    # Store expanded selection for actual filtering
-    expanded_selected = []
-    for sel in selected_topics:
-        if '(+' in sel and 'similar)' in sel:
-            # Find the original group
-            main_name = sel.split(' (+')[0]
+    st.sidebar.markdown("**🔍 Search Topics**")
+    topic_search = st.sidebar.text_input("Filter topics", placeholder="e.g., AI, Workplace", key="topic_search")
+    
+    if use_simple_topics:
+        # ===== SIMPLE MODE (FAST) =====
+        filtered_topics = [t for t in unique_topics if topic_search.lower() in t.lower()] if topic_search else unique_topics
+        
+        selected_topics = st.sidebar.multiselect(
+            f"Topics ({len(filtered_topics)} available)",
+            options=sorted(filtered_topics)
+        )
+        expanded_selected = selected_topics
+        
+        # Show performance note
+        st.sidebar.caption("⚡ Simple mode enabled for speed")
+        
+    else:
+        # ===== GROUPED MODE (SLOWER BUT PRETTIER) =====
+        with st.sidebar.spinner("Grouping topics..."):
+            # Apply search filter before grouping
+            if topic_search:
+                filtered_for_group = [t for t in unique_topics if topic_search.lower() in t.lower()]
+            else:
+                filtered_for_group = unique_topics
+            
+            # Get topic groups
+            topic_groups = consolidate_topics(filtered_for_group)
+            
+            # Create display list
+            flat_topics = []
+            group_map = {}  # Map display names to actual groups
+            
             for group in topic_groups:
-                if main_name in group or any(main_name in g for g in group):
-                    expanded_selected.extend(group)
-                    break
-        else:
-            expanded_selected.append(sel)
-else:
-    selected_topics = []
-    expanded_selected = []
+                if len(group) == 1:
+                    display_name = group[0]
+                    flat_topics.append(display_name)
+                    group_map[display_name] = group
+                else:
+                    main_topic = max(group, key=len)
+                    display_name = f"{main_topic} (+{len(group)-1} similar)"
+                    flat_topics.append(display_name)
+                    group_map[display_name] = group
+            
+            selected_display = st.sidebar.multiselect(
+                f"Topic Groups ({len(flat_topics)} available)",
+                options=sorted(flat_topics)
+            )
+            
+            # Expand selections for actual filtering
+            expanded_selected = []
+            for disp in selected_display:
+                if disp in group_map:
+                    expanded_selected.extend(group_map[disp])
+                else:
+                    expanded_selected.append(disp)
+            
+            selected_topics = selected_display
+            
+            # Show performance note
+            st.sidebar.caption("🐢 Grouped mode enabled (may be slower)")
 
 # Apply filters
 filtered_df = apply_filters(df, selected_sources, min_score, selected_companies, expanded_selected)
@@ -230,7 +291,7 @@ quality_pct = (total_quality / total_raw * 100) if total_raw > 0 else 0
 render_quality_badge(quality_pct, total_quality, total_raw)
 
 # ============================================
-# METRICS SECTION
+# METRICS SECTION - WITH 50% THRESHOLD
 # ============================================
 st.subheader("📈 Overview")
 col1, col2, col3, col4 = st.columns(4)
@@ -241,12 +302,16 @@ with col1:
 with col2:
     avg_score = stats_df['final_score'].mean()
     quality_avg = quality_df['final_score'].mean() if len(quality_df) > 0 else 0
+    
+    # Calculate high impact using 50% threshold
+    high_impact_count = len(stats_df[stats_df['final_score'] > HIGH_IMPACT_THRESHOLD])
+    
     render_metric_card(
         "Avg Score", 
         f"{avg_score:.1f}%", 
         "⭐", 
         ("#00C2FF", "#0077B6"),
-        subtitle=f"Quality: {quality_avg:.1f}%"
+        subtitle=f"Quality: {quality_avg:.1f}% | High Impact: {high_impact_count}"
     )
 
 with col3:
@@ -257,7 +322,21 @@ with col3:
 
 with col4:
     time_range = f"Last {days} days" if is_premium else "Last 7 days"
-    render_metric_card("Time Range", time_range, "📅", ("#FF6B6B", "#C92A2A"))
+    
+    # Calculate German focus with 50% threshold
+    german_focus_count = len(stats_df[stats_df['geographic_relevance'] > HIGH_IMPACT_THRESHOLD]) if 'geographic_relevance' in stats_df.columns else 0
+    german_focus_pct = (german_focus_count / len(stats_df) * 100) if len(stats_df) > 0 else 0
+    
+    # Calculate avg freshness
+    avg_freshness = stats_df['timeliness'].mean() if 'timeliness' in stats_df.columns else 0
+    
+    render_metric_card(
+        "Time Range", 
+        time_range, 
+        "📅", 
+        ("#FF6B6B", "#C92A2A"),
+        subtitle=f"German: {german_focus_pct:.0f}% | Fresh: {avg_freshness:.0f}%"
+    )
 
 # ============================================
 # INSIGHTS SECTION (Premium Only)

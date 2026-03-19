@@ -1,3 +1,4 @@
+
 # ============================================
 # FILTERING AND DATA PREPARATION - WITH FUZZY GROUPING
 # ============================================
@@ -114,3 +115,58 @@ def apply_filters(df, selected_sources, min_score, selected_companies, selected_
         ]
     
     return filtered_df
+
+# Cache for topic groups to avoid recomputing on every rerun
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def get_topic_groups(_df, topics_list=None):
+    """
+    Cached function to compute topic groups.
+    The underscore in _df tells st.cache_data to ignore it for hashing.
+    """
+    if topics_list is None:
+        # Extract topics from dataframe if not provided
+        all_topics = []
+        for topics in _df['extracted_topics'].dropna():
+            if isinstance(topics, list):
+                all_topics.extend(topics)
+        topics_list = [clean_entity_name(t) for t in all_topics if t]
+    
+    if not topics_list:
+        return []
+    
+    # Clean and deduplicate
+    cleaned = list(set(topics_list))
+    cleaned.sort()
+    
+    groups = []
+    used = set()
+    
+    for i, topic1 in enumerate(cleaned):
+        if i in used:
+            continue
+        
+        group = [topic1]
+        used.add(i)
+        
+        for j, topic2 in enumerate(cleaned[i+1:], i+1):
+            if j in used:
+                continue
+            
+            # Quick checks before expensive SequenceMatcher
+            if len(topic1) <= 5 and topic1.isupper() and topic2.upper() == topic1:
+                similarity = 1.0
+            elif topic1.lower().replace(' ', '') == topic2.lower().replace(' ', ''):
+                similarity = 1.0
+            else:
+                # Only run SequenceMatcher if names are somewhat similar in length
+                if abs(len(topic1) - len(topic2)) > 5:
+                    continue
+                similarity = SequenceMatcher(None, topic1.lower(), topic2.lower()).ratio()
+            
+            if similarity > 0.8:
+                group.append(topic2)
+                used.add(j)
+        
+        groups.append(group)
+    
+    return groups
