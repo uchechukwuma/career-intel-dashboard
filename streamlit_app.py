@@ -291,10 +291,12 @@ quality_pct = (total_quality / total_raw * 100) if total_raw > 0 else 0
 render_quality_badge(quality_pct, total_quality, total_raw)
 
 # ============================================
-# METRICS SECTION - WITH 50% THRESHOLD
+# METRICS SECTION - UNIFORM SIZE
 # ============================================
 st.subheader("📈 Overview")
-col1, col2, col3, col4 = st.columns(4)
+
+# Create equal width columns
+col1, col2, col3, col4 = st.columns(4, gap="medium")
 
 with col1:
     render_metric_card("Total Signals", len(stats_df), "📄", ("#667eea", "#764ba2"))

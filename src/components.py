@@ -7,13 +7,24 @@ from src.config import COLORS, BADGE_THRESHOLDS
 from src.clean import get_clean_company_string, get_clean_topics_string
 
 def render_metric_card(title, value, icon, color_gradient, subtitle=None):
-    """Render a beautiful metric card with DARK text for cloud visibility."""
+    """Render a uniform metric card with fixed height."""
+    # Create a container with fixed minimum height
+    subtitle_html = f'<p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0; font-size: 0.8rem;">{subtitle}</p>' if subtitle else ''
+    
     st.markdown(f"""
-    <div style="background: linear-gradient(135deg, {color_gradient[0]} 0%, {color_gradient[1]} 100%); padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 10px;">
+    <div style="background: linear-gradient(135deg, {color_gradient[0]} 0%, {color_gradient[1]} 100%); 
+                padding: 15px; 
+                border-radius: 10px; 
+                text-align: center; 
+                margin-bottom: 10px;
+                min-height: 140px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;">
         <h3 style="color: white; margin: 0; font-size: 1.5rem;">{icon}</h3>
         <h2 style="color: #0A0F1F; margin: 5px 0; font-size: 1.8rem; font-weight: bold;">{value}</h2>
         <p style="color: white; margin: 0; font-weight: 500;">{title}</p>
-        {f'<p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 0.8rem;">{subtitle}</p>' if subtitle else ''}
+        {subtitle_html}
     </div>
     """, unsafe_allow_html=True)
 
