@@ -16,7 +16,7 @@ def render_metric_card(title, value, icon, color_gradient, subtitle=None):
         padding: 20px 12px;
         border-radius: 12px;
         text-align: center;
-        height: 210px;
+        height: 300px;
         width: 100%;
         display: flex;
         flex-direction: column;
