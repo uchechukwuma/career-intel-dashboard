@@ -42,8 +42,6 @@ def get_latest_weekly_report():
         st.warning(f"Could not fetch weekly report: {e}")
         return None
 
-# REMOVED: is_metric_real function - we want to show ALL data
-
 def render_insights_section(is_premium):
     """Render the insights section with REAL data from MongoDB."""
     
@@ -56,15 +54,36 @@ def render_insights_section(is_premium):
     report = get_latest_weekly_report()
     
     if report:
-        # Display report metadata
+        # ===== FIXED: Report metadata with dark text on light background =====
+        st.markdown("### 📊 Report Overview")
         col1, col2, col3 = st.columns(3)
+        
         with col1:
-            st.metric("Report Week", report.get('week_display', 'N/A'))
+            week_display = report.get('week_display', 'N/A')
+            st.markdown(f"""
+            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center;">
+                <p style="color: #666; margin: 0; font-size: 0.8rem;">Report Week</p>
+                <p style="color: #0A0F1F; font-weight: bold; font-size: 1.4rem; margin: 5px 0;">{week_display}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
         with col2:
-            st.metric("Generated", report.get('generated_at', 'N/A')[:10])
+            generated = report.get('generated_at', 'N/A')[:10]
+            st.markdown(f"""
+            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center;">
+                <p style="color: #666; margin: 0; font-size: 0.8rem;">Generated</p>
+                <p style="color: #0A0F1F; font-weight: bold; font-size: 1.4rem; margin: 5px 0;">{generated}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
         with col3:
             signals_count = len(report.get('top_signals', []))
-            st.metric("Top Signals", signals_count)
+            st.markdown(f"""
+            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center;">
+                <p style="color: #666; margin: 0; font-size: 0.8rem;">Top Signals</p>
+                <p style="color: #0A0F1F; font-weight: bold; font-size: 1.4rem; margin: 5px 0;">{signals_count}</p>
+            </div>
+            """, unsafe_allow_html=True)
         
         # Executive Summary - Dark text
         if report.get('executive_summary'):
@@ -108,7 +127,7 @@ def render_insights_section(is_premium):
                 </div>
                 """, unsafe_allow_html=True)
         
-        # ===== UPDATED: Trend Velocity - Show ALL data =====
+        # ===== FIXED: Trend Velocity with dark text on light background =====
         if report.get('trend_velocity'):
             st.markdown("### 📊 Trend Velocity")
             trend = report['trend_velocity']
@@ -130,11 +149,11 @@ def render_insights_section(is_premium):
                             if 'Mom' in display_key:
                                 display_key = display_key.replace('Mom', 'MoM')
                     
-                            # Use st.metric with dark text background
+                            # Display with dark text on light background
                             st.markdown(f"""
-                            <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-bottom: 5px;">
-                                <p style="color: #0A0F1F; font-weight: bold; margin: 0;">{display_key}</p>
-                                <p style="color: #0A0F1F; font-size: 1.2rem; margin: 0;">{value}</p>
+                            <div style="background-color: #f0f2f6; padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                                <p style="color: #666; font-size: 0.8rem; margin: 0;">{display_key}</p>
+                                <p style="color: #0A0F1F; font-weight: bold; font-size: 1.1rem; margin: 0;">{value}</p>
                             </div>
                             """, unsafe_allow_html=True)
             else:
@@ -159,7 +178,7 @@ def render_insights_section(is_premium):
                 with col1:
                     if risk.get('critical'):
                         st.markdown(f"""
-                        <div style="background-color: {COLORS['danger']}; padding: 10px; border-radius: 5px; color: white;">
+                        <div style="background-color: {COLORS['danger']}; padding: 10px; border-radius: 5px; color: white; margin-bottom: 10px;">
                             <strong>CRITICAL</strong>
                         </div>
                         """, unsafe_allow_html=True)
@@ -174,7 +193,7 @@ def render_insights_section(is_premium):
                 with col2:
                     if risk.get('high'):
                         st.markdown(f"""
-                        <div style="background-color: {COLORS['warning']}; padding: 10px; border-radius: 5px; color: white;">
+                        <div style="background-color: {COLORS['warning']}; padding: 10px; border-radius: 5px; color: white; margin-bottom: 10px;">
                             <strong>HIGH</strong>
                         </div>
                         """, unsafe_allow_html=True)
@@ -189,7 +208,7 @@ def render_insights_section(is_premium):
                 with col3:
                     if risk.get('hiring'):
                         st.markdown(f"""
-                        <div style="background-color: {COLORS['success']}; padding: 10px; border-radius: 5px; color: white;">
+                        <div style="background-color: {COLORS['success']}; padding: 10px; border-radius: 5px; color: white; margin-bottom: 10px;">
                             <strong>HIRING</strong>
                         </div>
                         """, unsafe_allow_html=True)
@@ -208,7 +227,7 @@ def render_insights_section(is_premium):
             st.markdown("### 🔮 Next Week Forecast")
             for item in report['forecast']:
                 st.markdown(f"""
-                <div style="background-color: #F0F0F0; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                <div style="background-color: #F0F0F0; padding: 12px; border-radius: 8px; margin: 8px 0;">
                     <strong style="color: {COLORS['dark']};">📅 {item.get('date', '')}:</strong>
                     <span style="color: #333;"> {item.get('event', '')}</span>
                     {f'<br><small style="color: #666;">{item.get("detail", "")}</small>' if item.get('detail') else ''}
