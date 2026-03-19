@@ -291,54 +291,68 @@ quality_pct = (total_quality / total_raw * 100) if total_raw > 0 else 0
 render_quality_badge(quality_pct, total_quality, total_raw)
 
 # ============================================
-# METRICS SECTION - UNIFORM SIZE
+# METRICS SECTION - FORCE EQUAL HEIGHT
 # ============================================
 st.subheader("📈 Overview")
 
-# Create equal width columns
-col1, col2, col3, col4 = st.columns(4, gap="medium")
+# Use HTML/CSS grid instead of st.columns for better control
+st.markdown("""
+<style>
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .metric-grid > div {
+        height: 100%;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-with col1:
+# Create a grid container
+st.markdown('<div class="metric-grid">', unsafe_allow_html=True)
+
+# Column 1
+with st.container():
     render_metric_card("Total Signals", len(stats_df), "📄", ("#667eea", "#764ba2"))
 
-with col2:
+# Column 2
+with st.container():
     avg_score = stats_df['final_score'].mean()
     quality_avg = quality_df['final_score'].mean() if len(quality_df) > 0 else 0
-    
-    # Calculate high impact using 50% threshold
     high_impact_count = len(stats_df[stats_df['final_score'] > HIGH_IMPACT_THRESHOLD])
-    
     render_metric_card(
         "Avg Score", 
         f"{avg_score:.1f}%", 
         "⭐", 
         ("#00C2FF", "#0077B6"),
-        subtitle=f"Quality: {quality_avg:.1f}% | High Impact: {high_impact_count}"
+        subtitle=f"Quality: {quality_avg:.1f}% | High: {high_impact_count}"
     )
 
-with col3:
+# Column 3
+with st.container():
     if 'verified_source_name' in stats_df.columns:
         top_source = stats_df['verified_source_name'].value_counts().index[0] if len(stats_df) > 0 else "N/A"
-        display_source = top_source[:15] + "..." if len(top_source) > 15 else top_source
+        display_source = top_source[:12] + "..." if len(top_source) > 12 else top_source
         render_metric_card("Top Source", display_source, "📰", ("#FFD700", "#FFA500"))
 
-with col4:
+# Column 4
+with st.container():
     time_range = f"Last {days} days" if is_premium else "Last 7 days"
-    
-    # Calculate German focus with 50% threshold
     german_focus_count = len(stats_df[stats_df['geographic_relevance'] > HIGH_IMPACT_THRESHOLD]) if 'geographic_relevance' in stats_df.columns else 0
     german_focus_pct = (german_focus_count / len(stats_df) * 100) if len(stats_df) > 0 else 0
-    
-    # Calculate avg freshness
     avg_freshness = stats_df['timeliness'].mean() if 'timeliness' in stats_df.columns else 0
-    
     render_metric_card(
         "Time Range", 
         time_range, 
         "📅", 
         ("#FF6B6B", "#C92A2A"),
-        subtitle=f"German: {german_focus_pct:.0f}% | Fresh: {avg_freshness:.0f}%"
+        subtitle=f"DE: {german_focus_pct:.0f}% | Fresh: {avg_freshness:.0f}%"
     )
+
+# Close the grid container
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
 # INSIGHTS SECTION (Premium Only)
